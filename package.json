@@ -9,5 +9,8 @@
     "publish": "node scripts/kahaniworld-phase2-publisher.mjs --publish --limit 1",
     "update:dry-run": "node scripts/kahaniworld-phase2-publisher.mjs --update --limit 1",
     "update": "node scripts/kahaniworld-phase2-publisher.mjs --update --apply --limit 1"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
