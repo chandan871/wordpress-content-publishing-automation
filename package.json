@@ -1,0 +1,13 @@
+{
+  "name": "wordpress-content-publishing-automation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:wp": "node scripts/kahaniworld-phase2-publisher.mjs --check-wp",
+    "check:sheet": "node scripts/kahaniworld-phase2-publisher.mjs --check-sheet",
+    "dry-run": "node scripts/kahaniworld-phase2-publisher.mjs --dry-run --limit 1",
+    "publish": "node scripts/kahaniworld-phase2-publisher.mjs --publish --limit 1",
+    "update:dry-run": "node scripts/kahaniworld-phase2-publisher.mjs --update --limit 1",
+    "update": "node scripts/kahaniworld-phase2-publisher.mjs --update --apply --limit 1"
+  }
+}
