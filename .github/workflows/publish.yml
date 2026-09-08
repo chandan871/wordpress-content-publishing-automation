@@ -1,0 +1,36 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: wordpress-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish
+        run: npm run publish
+        env:
+          KW_SITE_URL: ${{ vars.KW_SITE_URL }}
+          KW_WP_USERNAME: ${{ vars.KW_WP_USERNAME }}
+          KW_WP_APP_PASSWORD: ${{ secrets.KW_WP_APP_PASSWORD }}
+          KW_GOOGLE_SHEET_ID: ${{ vars.KW_GOOGLE_SHEET_ID }}
+          KW_SHEET_WEBHOOK_URL: ${{ vars.KW_SHEET_WEBHOOK_URL }}
+          KW_SHEET_WEBHOOK_SECRET: ${{ secrets.KW_SHEET_WEBHOOK_SECRET }}
