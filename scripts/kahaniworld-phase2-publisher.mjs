@@ -213,6 +213,8 @@ await fs.writeFile(reportPath, JSON.stringify(redactReport(report), null, 2), "u
 log("report", reportPath);
 console.log(JSON.stringify(redactReport(report), null, 2));
 
+if (!report.ok) process.exitCode = 1;
+
 function parseArgs(argv) {
   const parsed = {};
   for (let i = 0; i < argv.length; i += 1) {
