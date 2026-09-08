@@ -2,6 +2,11 @@ name: Publish
 
 on:
   workflow_dispatch:
+    inputs:
+      row_id:
+        description: "Content Queue row ID to publish"
+        required: true
+        type: string
 
 concurrency:
   group: wordpress-production
@@ -25,8 +30,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Preflight dry run
+        run: node scripts/kahaniworld-phase2-publisher.mjs --dry-run --row-id "${{ inputs.row_id }}"
+        env:
+          KW_SITE_URL: ${{ vars.KW_SITE_URL }}
+          KW_WP_USERNAME: ${{ vars.KW_WP_USERNAME }}
+          KW_WP_APP_PASSWORD: ${{ secrets.KW_WP_APP_PASSWORD }}
+          KW_GOOGLE_SHEET_ID: ${{ vars.KW_GOOGLE_SHEET_ID }}
+          KW_SHEET_WEBHOOK_URL: ${{ vars.KW_SHEET_WEBHOOK_URL }}
+          KW_SHEET_WEBHOOK_SECRET: ${{ secrets.KW_SHEET_WEBHOOK_SECRET }}
+
       - name: Publish
-        run: npm run publish
+        run: node scripts/kahaniworld-phase2-publisher.mjs --publish --limit 1 --row-id "${{ inputs.row_id }}"
         env:
           KW_SITE_URL: ${{ vars.KW_SITE_URL }}
           KW_WP_USERNAME: ${{ vars.KW_WP_USERNAME }}
