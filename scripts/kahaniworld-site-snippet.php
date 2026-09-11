@@ -76,6 +76,80 @@ add_shortcode('kw_latest_stories', function ($atts) {
     return ob_get_clean();
 });
 
+add_shortcode('kw_popular_stories', function ($atts) {
+    $atts = shortcode_atts(['posts_per_page' => 10], $atts, 'kw_popular_stories');
+
+    $paged = max(1, (int) (get_query_var('paged') ?: get_query_var('page') ?: 1));
+
+    $query = new WP_Query([
+        'post_type' => 'post',
+        'post_status' => 'publish',
+        'posts_per_page' => (int) $atts['posts_per_page'],
+        'paged' => $paged,
+        'ignore_sticky_posts' => true,
+        'meta_key' => 'kw_story_views',
+        'orderby' => 'meta_value_num',
+        'order' => 'DESC',
+    ]);
+
+    ob_start();
+
+    echo '<div class="kw-story-list">';
+
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+
+            $views = number_format_i18n(kw_story_views(get_the_ID()));
+
+            echo '<article class="kw-story-card">';
+            echo '<h2><a href="' . esc_url(get_permalink()) . '">' . esc_html(get_the_title()) . '</a></h2>';
+            echo '<div class="kw-card-meta">';
+            echo '<span>' . esc_html(get_the_date()) . '</span>';
+            echo '<span>👁 ' . esc_html($views) . ' views</span>';
+            echo '</div>';
+            echo '<p>' . esc_html(wp_trim_words(get_the_excerpt() ?: wp_strip_all_tags(get_the_content()), 34, '...')) . '</p>';
+            echo '<a class="kw-read-link" href="' . esc_url(get_permalink()) . '">पूरी कहानी पढ़ें</a>';
+            echo '</article>';
+        }
+    } else {
+        echo '<p class="kw-empty">अभी कोई कहानी उपलब्ध नहीं है।</p>';
+    }
+
+    echo '</div>';
+
+    $links = paginate_links([
+        'total' => max(1, (int) $query->max_num_pages),
+        'current' => $paged,
+        'type' => 'list',
+        'prev_text' => '← Previous',
+        'next_text' => 'Next →',
+    ]);
+
+    if ($links) {
+        echo '<nav class="kw-pagination">' . $links . '</nav>';
+    }
+
+    wp_reset_postdata();
+
+    return ob_get_clean();
+});
+
+add_filter('the_excerpt', function ($excerpt) {
+    if (!is_category() || !in_the_loop() || !is_main_query()) {
+        return $excerpt;
+    }
+
+    if (strpos($excerpt, 'class="read-more"') !== false) {
+        return $excerpt;
+    }
+
+    return $excerpt
+        . '<p class="kw-archive-read">'
+        . '<a href="' . esc_url(get_permalink()) . '">पूरी कहानी पढ़ें</a>'
+        . '</p>';
+}, 20);
+
 add_action('wp_head', function () {
     ?>
     <style id="kahaniworld-design-system">
@@ -282,6 +356,104 @@ add_action('wp_head', function () {
             margin: 0 0 12px;
             color: var(--kw-text);
         }
+
+        /* Category archive card layout */
+body.category .site-main {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+body.category .site-main > .page-header {
+    grid-column: 1 / -1;
+}
+
+body.category .site-main > article {
+    background: var(--kw-card);
+    border: 1px solid var(--kw-border);
+    border-left: 5px solid var(--kw-accent);
+    padding: 15px 14px;
+    margin: 0;
+}
+
+body.category .site-main > article .inside-article {
+    padding: 0;
+}
+
+body.category .site-main > article .entry-title {
+    font-size: 21px;
+    line-height: 1.34;
+    margin: 0 0 8px;
+}
+
+body.category .site-main > article .entry-title a {
+    color: var(--kw-brand-dark);
+    text-decoration: none;
+}
+
+body.category .site-main > article .entry-meta {
+    color: var(--kw-muted);
+    font-size: 13px;
+}
+
+body.category .site-main > article .entry-summary {
+    font-size: 15px;
+    line-height: 1.62;
+    margin: 0 0 12px;
+    color: var(--kw-text);
+}
+
+body.category .site-main > article .entry-summary p {
+    margin: 0;
+}
+
+body.category .site-main > article footer.entry-meta {
+    border-top: 1px solid var(--kw-border);
+    padding-top: 9px;
+    margin-top: 10px;
+}
+
+body.category .site-main > article footer.entry-meta a {
+    color: var(--kw-accent);
+}
+
+@media (max-width: 700px) {
+    body.category .site-main {
+        grid-template-columns: 1fr;
+    }
+}
+body.category .site-main > article .inside-article {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+}
+
+body.category .site-main > article .entry-header,
+body.category .site-main > article .entry-summary,
+body.category .site-main > article footer.entry-meta {
+    background: transparent;
+}
+
+
+body.category .kw-archive-read {
+    margin: 12px 0 0;
+}
+
+body.category .kw-archive-read a {
+    display: inline-block;
+    background: var(--kw-accent);
+    color: #fff;
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+body.category .kw-archive-read a:hover {
+    opacity: 0.9;
+}
+        
         .kw-pagination ul {
             display: flex;
             gap: 8px;
