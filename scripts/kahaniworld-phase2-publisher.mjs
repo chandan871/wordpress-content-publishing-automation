@@ -7,6 +7,7 @@ const EXPECTED_HEADERS = [
   "ID",
   "Title",
   "Story",
+  "Teaser",
   "Status",
   "Category",
   "Tags",
@@ -551,18 +552,24 @@ async function prepareRow(row, context) {
   const suppliedSeoTitle = cleanText(cell(row, "SEO Title"));
   const suppliedMetaDescription = cleanText(cell(row, "Meta Description"));
   const suppliedSlug = cleanText(cell(row, "Slug"));
+  const suppliedTeaser = cleanText(cell(row, "Teaser"));
   const suppliedTags = splitList(cell(row, "Tags"));
 
   const category = resolveCategory(categoryName, context.categories);
   const seoTitle = suppliedSeoTitle || generateSeoTitle(title);
   const metaDescription = suppliedMetaDescription || generateMetaDescription({ title, story, categoryName });
   const slug = suppliedSlug ? slugify(suppliedSlug) : await generateUniqueSlug(title, categoryName, id, context.posts);
-  const excerpt = generateExcerpt(story);
+  const excerpt = suppliedTeaser || generateExcerpt(story);
   const tags = suppliedTags.length ? suppliedTags : generateTags({ title, story, categoryName });
   const tagIds = await resolveTags(tags, context.tags, { create: false });
   const internalLinks = selectInternalLinks({ categoryId: category.id, currentTitle: title, posts: context.posts });
   assertRawInternalLinks(internalLinks, "selectInternalLinks");
-  const content = buildPostHtml({ story, internalLinks });
+  const content = buildPostHtml({
+  story,
+  internalLinks,
+  title,
+  seriesPosts: context.posts,
+});
   assertGeneratedHrefs(content, "buildPostHtml");
 
   return {
@@ -861,10 +868,104 @@ function selectInternalLinks({ categoryId, currentTitle, posts }) {
     .filter((link) => link.url);
 }
 
-function buildPostHtml({ story, internalLinks }) {
+function parseSeriesPart(title) {
+  const value = cleanText(title);
+
+  let match = value.match(/^(.*?)\s*[-–—|]\s*Part\s*(\d+)(?:\s*\|\s*.*)?$/i);
+  if (match) {
+    return {
+      seriesTitle: cleanText(match[1]),
+      partNumber: Number(match[2]),
+      separator: match[1].trim(),
+    };
+  }
+
+  match = value.match(/^(.*?)\s*भाग\s*(\d+)(?:\s*\|\s*.*)?$/i);
+  if (match) {
+    return {
+      seriesTitle: cleanText(match[1]),
+      partNumber: Number(match[2]),
+      separator: match[1].trim(),
+    };
+  }
+
+  return null;
+}
+
+function getSeriesParts(title, posts) {
+  const current = parseSeriesPart(title);
+  if (!current) return [];
+
+  const parts = posts
+    .map((post) => {
+      const parsed = parseSeriesPart(post.title?.rendered || post.title || "");
+      if (!parsed) return null;
+
+      if (
+        normalizeForCompare(parsed.seriesTitle) !==
+        normalizeForCompare(current.seriesTitle)
+      ) {
+        return null;
+      }
+
+      return {
+        id: Number(post.id),
+        title: post.title?.rendered || post.title || "",
+        link: post.link || "",
+        partNumber: parsed.partNumber,
+      };
+    })
+    .filter(Boolean);
+
+  return parts
+    .sort((a, b) => a.partNumber - b.partNumber)
+    .filter(
+      (part, index, array) =>
+        array.findIndex((item) => item.partNumber === part.partNumber) === index
+    );
+}
+
+function buildSeriesNavigation(title, posts) {
+  const parts = getSeriesParts(title, posts);
+
+  if (parts.length < 2) return "";
+
+  const current = parseSeriesPart(title);
+  if (!current) return "";
+
+  const links = parts.map((part) => {
+    const isCurrent = part.partNumber === current.partNumber;
+
+    if (isCurrent) {
+      return `<span class="kw-series-current">Part ${part.partNumber}</span>`;
+    }
+
+    return `<a href="${escHtml(part.link)}">Part ${part.partNumber}</a>`;
+  });
+
+  return `
+<nav class="kw-series-nav" aria-label="Story parts">
+  <div class="kw-series-title">इस कहानी के सभी भाग</div>
+  <div class="kw-series-links">
+    ${links.join(" <span class=\"kw-series-separator\">|</span> ")}
+  </div>
+</nav>`;
+}
+
+function normalizeForCompare(value) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[–—-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+
+function buildPostHtml({ story, internalLinks, title, seriesPosts = [] }) {
 
   /*
    * Clean text everywhere.
+   *
    * Handles:
    * - literal "\n"
    * - real line breaks
@@ -895,27 +996,19 @@ function buildPostHtml({ story, internalLinks }) {
 
   assertRawInternalLinks(safeInternalLinks, "buildPostHtml");
 
-
   /*
    * STORY CLEANING
    */
   const cleanStory = cleanContentText(story);
 
-
   /*
    * Split story into sentences.
-   *
-   * This works even when sentences are joined like:
-   * "कहानी खत्म हुई।फिर वह घर गई।उसने..."
-   *
-   * So it does NOT depend on spaces after । . ! ?
    */
   const sentences = (
     cleanStory.match(/[^।.!?]+[।.!?]+|[^।.!?]+$/g) || []
   )
     .map((sentence) => cleanContentText(sentence))
     .filter(Boolean);
-
 
   /*
    * BUILD SMALL PARAGRAPHS
@@ -925,7 +1018,6 @@ function buildPostHtml({ story, internalLinks }) {
   const paragraphGroups = [];
 
   for (let i = 0; i < sentences.length; i += 3) {
-
     const paragraph = cleanContentText(
       sentences.slice(i, i + 3).join(" ")
     );
@@ -935,14 +1027,12 @@ function buildPostHtml({ story, internalLinks }) {
     }
   }
 
-
   const paragraphs = paragraphGroups
     .map(
       (paragraph) =>
         `<p>${escapeHtml(paragraph)}</p>`
     )
     .join("");
-
 
   /*
    * INTERNAL LINKS
@@ -963,7 +1053,20 @@ ${safeInternalLinks
 </nav>`
     : "";
 
-return `<article class="kw-story-post"><div class="kw-story-body">${paragraphs}</div>${inlineHtml(links)}</article>`;
+  /*
+   * MULTIPART STORY NAVIGATION
+   */
+  const seriesNavigation = buildSeriesNavigation(
+    title,
+    seriesPosts
+  );
+
+  return `<article class="kw-story-post">
+${inlineHtml(seriesNavigation)}
+<div class="kw-story-body">${paragraphs}</div>
+${inlineHtml(seriesNavigation)}
+${inlineHtml(links)}
+</article>`;
 }
 
 function inlineHtml(value) {

@@ -660,3 +660,7 @@ add_action('wp_footer', function () {
     </script>
     <?php
 }, 99);
+
+add_filter('generate_comments_title_output', function ($output, $comments_title, $comments_number) {
+    return '<h3 class="comments-title">Comments</h3>';
+}, 10, 3);
