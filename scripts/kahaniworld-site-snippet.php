@@ -395,6 +395,9 @@ body.category .site-main > article .entry-meta {
     color: var(--kw-muted);
     font-size: 13px;
 }
+body.category .kw-archive-views {
+            margin-left: 8px;
+}
 
 body.category .site-main > article .entry-summary {
     font-size: 15px;
@@ -664,3 +667,444 @@ add_action('wp_footer', function () {
 add_filter('generate_comments_title_output', function ($output, $comments_title, $comments_number) {
     return '<h3 class="comments-title">Comments</h3>';
 }, 10, 3);
+/* Show story views on category archive cards */
+add_filter('generate_header_entry_meta_items', function ($items) {
+    if (is_category()) {
+        $items[] = 'kw-story-views';
+    }
+
+    return $items;
+}, 20);
+
+add_action('generate_post_meta_items', function ($item) {
+    if ('kw-story-views' !== $item || !is_category()) {
+        return;
+    }
+
+    $views = number_format_i18n(kw_story_views(get_the_ID()));
+
+    echo '<span class="kw-archive-views">👁 ' . esc_html($views) . '</span>';
+});
+
+
+/* Show story tags directly after the story content */
+// add_action('generate_after_entry_content', function () {
+//     if (!is_singular('post')) {
+//         return;
+//     }
+
+//     $tags = get_the_tags(get_queried_object_id());
+
+//     if (empty($tags) || is_wp_error($tags)) {
+//         return;
+//     }
+
+//     echo '<div class="kw-story-tags">';
+//     echo '<strong>Tags:</strong> ';
+
+//     $links = [];
+
+//     foreach ($tags as $tag) {
+//         $links[] = '<a href="' .
+//             esc_url(get_tag_link($tag->term_id)) . '">' .
+//             esc_html($tag->name) .
+//             '</a>';
+//     }
+
+//     echo implode(', ', $links);
+//     echo '</div>';
+// }, 20);
+
+/* Hide only the original duplicate tag list */
+add_action('wp_head', function () {
+    if (!is_singular('post')) {
+        return;
+    }
+    ?>
+    <style>
+        body.single-post footer.entry-meta .tags-links {
+            display: none !important;
+        }
+
+        .kw-story-tags {
+            margin: 18px 0 24px;
+            padding: 12px 14px;
+            border: 1px solid var(--kw-border);
+            background: var(--kw-card);
+            color: var(--kw-text);
+            line-height: 1.8;
+        }
+
+        .kw-story-tags strong {
+            color: var(--kw-brand-dark);
+            margin-right: 6px;
+        }
+
+        .kw-story-tags a {
+            color: var(--kw-link);
+        }
+    </style>
+    <?php
+}, 99);
+
+
+/* Insert story tags immediately after the related-story links */
+add_filter('the_content', function ($content) {
+    if (!is_singular('post') || !in_the_loop() || !is_main_query()) {
+        return $content;
+    }
+    $content = str_replace(
+    '<strong>और कहानियां पढ़ें</strong>',
+    '<strong>Related Stories</strong>',
+    $content
+);
+
+    $post_id = get_queried_object_id();
+    $tags = get_the_tags($post_id);
+
+    if (empty($tags) || is_wp_error($tags)) {
+        return $content;
+    }
+
+    $links = [];
+
+    foreach ($tags as $tag) {
+        $links[] = '<a href="' .
+            esc_url(get_tag_link($tag->term_id)) . '">' .
+            esc_html($tag->name) .
+            '</a>';
+    }
+
+    $tag_html = '<div class="kw-story-tags"><strong>Tags:</strong> ' .
+        implode(', ', $links) .
+        '</div>';
+
+    $related_pos = strpos($content, '<nav class="kw-story-links">');
+
+if ($related_pos !== false) {
+    return substr($content, 0, $related_pos) .
+        $tag_html .
+        substr($content, $related_pos);
+}
+
+$closing = strrpos($content, '</article>');
+
+if ($closing !== false) {
+    return substr($content, 0, $closing) .
+        $tag_html .
+        substr($content, $closing);
+}
+
+    return $content . $tag_html;
+}, 20);
+
+
+
+/* Manually curated Best Stories list */
+add_filter('the_content', function ($content) {
+    if (!is_singular('post') || !in_the_loop() || !is_main_query()) {
+        return $content;
+    }
+
+    // Keep the first 10 as your preferred editorial order.
+    // The extra slugs are backups if a story is missing or is the current post.
+    $best_story_slugs = [
+        'village-hindi-story-vidhwa-chachi',
+        'sautan-doodhwala-hindi-sex-story',
+        'delivery-boy-rajat-burka-wife-sex-story',
+        'gaon-charwaha-kalua-chachi-anokha-raaz',
+        'bhatiji-uski-saheli-ki-chudai-adult-hindi-story',
+        'chachi-ki-suhagraat-village-sex-story',
+        'sexy-wife-ki-real-kahani',
+        'hindi-sex-stories-cuck-threesome',
+        'hot-adult-story-neha-ki-garam-choot-ki-aag',
+        'muslim-girl-sara-fucking-story',
+        'real-sex-story-naina-ki-namkin-choot',
+
+        // Backup stories
+        'hot-bhabhi-ki-sex-story',
+        'desi-hindi-story-barish-ki-raat-ayesha',
+        'jungle-me-pahli-chudai-hindi-sex-story',
+    ];
+
+    $current_post_id = get_queried_object_id();
+    $items = [];
+    $seen_ids = [];
+
+    foreach ($best_story_slugs as $slug) {
+        if (count($items) >= 10) {
+            break;
+        }
+
+        $post = get_page_by_path($slug, OBJECT, 'post');
+
+        if (
+            !$post ||
+            $post->post_status !== 'publish' ||
+            (int) $post->ID === (int) $current_post_id ||
+            in_array((int) $post->ID, $seen_ids, true)
+        ) {
+            continue;
+        }
+
+        $seen_ids[] = (int) $post->ID;
+
+        $items[] = '<li><a href="' .
+            esc_url(get_permalink($post->ID)) . '">' .
+            esc_html(get_the_title($post->ID)) .
+            '</a></li>';
+    }
+
+    if (empty($items)) {
+        return $content;
+    }
+
+    $best_html = '<section class="kw-best-stories">';
+    $best_html .= '<h2>Top 10 Stories on Kahani World</h2><ol>';
+    $best_html .= implode('', $items);
+    $best_html .= '</ol></section>';
+
+    // Insert after the related-story links, before the closing article.
+    $closing = strrpos($content, '</article>');
+
+    if ($closing !== false) {
+        return substr($content, 0, $closing) .
+            $best_html .
+            substr($content, $closing);
+    }
+
+    return $content . $best_html;
+}, 30);
+
+/* Best Stories styling */
+add_action('wp_head', function () {
+    if (!is_singular('post')) {
+        return;
+    }
+    ?>
+    <style>
+        .kw-best-stories {
+            margin: 24px 0;
+            padding: 16px;
+            border: 1px solid var(--kw-border);
+            background: var(--kw-card);
+            color: var(--kw-text);
+            line-height: 1.8;
+        }
+
+        /* .kw-best-stories h2 {
+            margin: 0 0 10px;
+            color: var(--kw-brand-dark);
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.8;
+        } */
+            .kw-best-stories h2 {
+    margin: 0 0 10px !important;
+    padding: 0 !important;
+    color: var(--kw-brand-dark) !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    line-height: 1.8 !important;
+    text-decoration: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+        .kw-best-stories ol {
+            margin: 0;
+            padding-left: 24px;
+        }
+
+        .kw-best-stories li {
+            margin-bottom: 6px;
+        }
+
+        .kw-best-stories a {
+            color: var(--kw-link);
+            font-weight: 600;
+        }
+
+        
+
+.kw-story-tags strong,
+.kw-story-links > strong,
+.kw-best-stories h2 {
+    font-family: inherit !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    line-height: 1.8 !important;
+    text-decoration: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+/* Remove underlines from section headings, not story links */
+.kw-story-tags strong a,
+.kw-story-links > strong a,
+.kw-best-stories h2 a {
+    text-decoration: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+}
+.kw-story-tags,
+.kw-story-links,
+.kw-best-stories {
+    text-decoration: none !important;
+}
+
+
+/* Remove underlines from links in these three story sections */
+body.single-post .kw-story-tags a,
+body.single-post .kw-story-links a,
+body.single-post .kw-best-stories a {
+    text-decoration: none !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+/* Keep links clean when hovered or focused too */
+body.single-post .kw-story-tags a:hover,
+body.single-post .kw-story-links a:hover,
+body.single-post .kw-best-stories a:hover,
+body.single-post .kw-story-tags a:focus,
+body.single-post .kw-story-links a:focus,
+body.single-post .kw-best-stories a:focus {
+    text-decoration: none !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+
+    </style>
+    <?php
+}, 99);
+
+
+/* KahaniWorld: custom Previous/Next Story navigation */
+add_action('generate_after_entry_content', function () {
+    if (!is_singular('post')) {
+        return;
+    }
+
+    $previous = get_previous_post();
+    $next = get_next_post();
+
+    if (!$previous && !$next) {
+        return;
+    }
+
+    echo '<nav class="kw-story-navigation" aria-label="Story navigation">';
+
+    if ($previous) {
+        echo '<a class="kw-previous-story" href="' .
+            esc_url(get_permalink($previous->ID)) . '">' .
+            '<span>← Previous Story</span>' .
+            '<strong>' . esc_html(get_the_title($previous->ID)) . '</strong>' .
+            '</a>';
+    }
+
+    if ($next) {
+        echo '<a class="kw-next-story" href="' .
+            esc_url(get_permalink($next->ID)) . '">' .
+            '<span>Next Story →</span>' .
+            '<strong>' . esc_html(get_the_title($next->ID)) . '</strong>' .
+            '</a>';
+    }
+
+    echo '</nav>';
+}, 30);
+
+
+/* KahaniWorld: navigation, category links and footer styling */
+add_action('wp_head', function () {
+    if (!is_singular('post')) {
+        return;
+    }
+    ?>
+    <style>
+        /* Hide GeneratePress's original navigation */
+        body.single-post footer.entry-meta nav#nav-below.post-navigation {
+            display: none !important;
+        }
+
+        /* Custom Previous/Next Story cards */
+        body.single-post .kw-story-navigation {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin: 32px 0 24px;
+        }
+
+        body.single-post .kw-story-navigation a {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+            padding: 12px;
+            background: var(--kw-card);
+            border: 1px solid var(--kw-border);
+            border-left: 4px solid var(--kw-accent);
+            color: var(--kw-link);
+            line-height: 1.6;
+            text-decoration: none !important;
+            overflow-wrap: anywhere;
+            box-sizing: border-box;
+        }
+
+        body.single-post .kw-story-navigation .kw-next-story {
+            border-left: 1px solid var(--kw-border);
+            border-right: 4px solid var(--kw-accent);
+            text-align: right;
+        }
+
+        body.single-post .kw-story-navigation a span {
+            color: var(--kw-brand-dark) !important;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        body.single-post .kw-story-navigation a strong {
+            color: var(--kw-link);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        body.single-post .kw-story-navigation a:hover {
+            border-color: var(--kw-brand);
+        }
+
+        /* Related categories: brown links with underlines */
+        body.single-post .kw-seo-links,
+        body.single-post .kw-seo-links strong {
+            color: #24201b !important;
+        }
+
+        body.single-post .kw-seo-links a {
+            color: var(--kw-link) !important;
+            text-decoration: underline !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            background-image: none !important;
+        }
+
+        /* Remove redundant folder-icon category metadata */
+        body.single-post footer.entry-meta .cat-links {
+            display: none !important;
+        }
+
+        @media (max-width: 480px) {
+            body.single-post .kw-story-navigation {
+                gap: 8px;
+            }
+
+            body.single-post .kw-story-navigation a {
+                padding: 10px;
+            }
+        }
+    </style>
+    <?php
+}, 99);

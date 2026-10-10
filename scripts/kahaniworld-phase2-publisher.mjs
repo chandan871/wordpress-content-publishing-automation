@@ -803,23 +803,51 @@ function transliterateDevanagari(value) {
   return output;
 }
 
-function generateTags({ title, story, categoryName }) {
-  const source = `${title} ${story}`;
-  const tags = new Set([categoryName.replace(/\s*Stories$/i, " Story")]);
-  const candidates = [
-    ["देसी", "Desi Kahani"],
-    ["गांव", "Village Story"],
-    ["गाँव", "Village Story"],
-    ["बारिश", "Barish Ki Raat"],
-    ["रोमांटिक", "Romantic Kahani"],
-    ["भाभी", "Bhabhi Story"],
-    ["चाची", "Chachi Story"],
-    ["कॉलेज", "College Story"],
-  ];
-  for (const [needle, tag] of candidates) {
-    if (source.includes(needle)) tags.add(tag);
+function generateTags({ title = "", story = "", categoryName = "" }) {
+  const titleText = String(title).trim();
+  const storyText = String(story).trim();
+  const source = `${titleText} ${storyText}`;
+
+  const tags = new Set();
+
+  // 1. Category-based tag
+  if (categoryName) {
+    const categoryTag = categoryName
+      .trim()
+      .replace(/\s*Stories$/i, " Story");
+
+    if (categoryTag) {
+      tags.add(categoryTag);
+    }
   }
-  tags.add("Hindi Story");
+
+  // 2. Specific, controlled tag rules
+  const candidates = [
+    // Story type / setting
+    [/(?:देसी|देशी)/i, "Desi Kahani"],
+    [/(?:गांव|गाँव|गांव की|गाँव की)/i, "Village Story"],
+
+    // Only add this when the actual phrase/theme is present
+    [/(?:बारिश\s*की\s*रात|बरसात\s*की\s*रात)/i, "Barish Ki Raat"],
+
+    // Character/theme
+    [/भाभी/i, "Bhabhi Story"],
+    [/चाची/i, "Chachi Story"],
+    [/(?:कॉलेज|college)/i, "College Story"],
+    [/(?:डिलीवरी\s*बॉय|delivery\s*boy)/i, "Delivery Boy Story"],
+    [/(?:बीवी|पत्नी)/i, "Wife Story"],
+
+    // Story style
+    [/(?:रोमांटिक|romantic)/i, "Romantic Kahani"],
+  ];
+
+  for (const [pattern, tag] of candidates) {
+    if (pattern.test(source)) {
+      tags.add(tag);
+    }
+  }
+
+  // Maximum 5 meaningful tags
   return [...tags].slice(0, 5);
 }
 
