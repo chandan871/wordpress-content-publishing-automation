@@ -27,7 +27,7 @@ add_filter('the_content', function ($content) {
     }
 
     $views = number_format_i18n(kw_story_views());
-    $meta = '<div class="kw-story-meta"><span>👁 ' . esc_html($views) . ' views</span><span>नई कहानियां रोज रात 9 बजे</span></div>';
+    $meta = '<div class="kw-story-meta"><span>👁 ' . esc_html($views) . ' views</span><span>Kahani World story</span></div>';
 
     return $meta . $content;
 }, 12);
@@ -573,6 +573,24 @@ body.category .kw-archive-read a:hover {
             cursor: pointer;
             font-size: 18px;
         }
+        /* Keep the desktop navigation on one line where possible and allow a clean wrap on smaller desktops. */
+        @media (min-width: 761px) {
+            .main-navigation .inside-navigation { display: flex; align-items: center; }
+            .main-navigation .main-nav { flex: 1 1 auto; min-width: 0; }
+            .main-navigation .main-nav > ul { display: flex; flex-wrap: wrap; align-items: center; }
+            .main-navigation .main-nav > ul > li { flex: 0 0 auto; }
+            .main-navigation .main-nav > ul > li > a { padding-left: 11px; padding-right: 11px; white-space: normal; line-height: 1.35; }
+        }
+        .kw-legal .kw-story-card { line-height: 1.7; }
+        .kw-legal .kw-story-card h2 { color: var(--kw-brand-dark); margin-top: 22px; }
+        .kw-legal .kw-story-card h2:first-child { margin-top: 0; }
+        .kw-legal .kw-story-card ul { padding-left: 22px; }
+        .kw-legal .kw-story-card li { margin-bottom: 8px; }
+        .kw-legal .kw-story-card a { overflow-wrap: anywhere; }
+        @media (max-width: 760px) {
+            .main-navigation .main-nav > ul > li > a { white-space: normal; }
+        }
+
         @media (max-width: 760px) {
             .site-content {
                 margin-top: 0;
@@ -630,14 +648,21 @@ add_action('wp_footer', function () {
                     <a href="/category/hindi-adult-stories/">Hindi Stories</a>
                     <a href="/category/desi-stories/">Desi Stories</a>
                     <a href="/category/village-stories/">Village Stories</a>
+                    <a href="/category/real-stories/">Real Stories</a>
+                    <a href="/category/romantic-stories/">Romantic Stories</a>
+                    <a href="/category/hindi-sex-stories/">Hindi Sex Stories</a>
+                    <a href="/category/bhabhi-sex-story/">Bhabhi Sex Story</a>
                 </div>
             </section>
             <section>
                 <h3>Business</h3>
                 <div class="kw-footer-links">
+                    <a href="/about/">About</a>
                     <a href="/contact/">Contact</a>
                     <a href="/advertise/">Advertise</a>
                     <a href="/privacy-policy/">Privacy Policy</a>
+                    <a href="/cookies-policy/">Cookies Policy</a>
+                    <a href="/terms-of-use/">Terms of Use</a>
                 </div>
             </section>
         </div>
