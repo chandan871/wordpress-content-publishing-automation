@@ -26,8 +26,8 @@ add_filter('the_content', function ($content) {
         return $content;
     }
 
-    $views = number_format_i18n(kw_story_views());
-    $meta = '<div class="kw-story-meta"><span>👁 ' . esc_html($views) . ' views</span><span>Kahani World story</span></div>';
+    // Keep tracking story views internally, but do not expose counts to visitors.
+    $meta = '<div class="kw-story-meta"><span>Kahani World story</span></div>';
 
     return $meta . $content;
 }, 12);
@@ -48,10 +48,9 @@ add_shortcode('kw_latest_stories', function ($atts) {
     if ($query->have_posts()) {
         while ($query->have_posts()) {
             $query->the_post();
-            $views = number_format_i18n(kw_story_views(get_the_ID()));
             echo '<article class="kw-story-card">';
             echo '<h2><a href="' . esc_url(get_permalink()) . '">' . esc_html(get_the_title()) . '</a></h2>';
-            echo '<div class="kw-card-meta"><span>' . esc_html(get_the_date()) . '</span><span>👁 ' . esc_html($views) . '</span></div>';
+            echo '<div class="kw-card-meta"><span>' . esc_html(get_the_date()) . '</span></div>';
             echo '<p>' . esc_html(wp_trim_words(get_the_excerpt() ?: wp_strip_all_tags(get_the_content()), 34, '...')) . '</p>';
             echo '<a class="kw-read-link" href="' . esc_url(get_permalink()) . '">पूरी कहानी पढ़ें</a>';
             echo '</article>';
@@ -100,13 +99,10 @@ add_shortcode('kw_popular_stories', function ($atts) {
         while ($query->have_posts()) {
             $query->the_post();
 
-            $views = number_format_i18n(kw_story_views(get_the_ID()));
-
             echo '<article class="kw-story-card">';
             echo '<h2><a href="' . esc_url(get_permalink()) . '">' . esc_html(get_the_title()) . '</a></h2>';
             echo '<div class="kw-card-meta">';
             echo '<span>' . esc_html(get_the_date()) . '</span>';
-            echo '<span>👁 ' . esc_html($views) . ' views</span>';
             echo '</div>';
             echo '<p>' . esc_html(wp_trim_words(get_the_excerpt() ?: wp_strip_all_tags(get_the_content()), 34, '...')) . '</p>';
             echo '<a class="kw-read-link" href="' . esc_url(get_permalink()) . '">पूरी कहानी पढ़ें</a>';
@@ -573,6 +569,21 @@ body.category .kw-archive-read a:hover {
             cursor: pointer;
             font-size: 18px;
         }
+        /* Desktop: use the available screen width instead of leaving a large empty sidebar gutter. */
+        @media (min-width: 761px) {
+            .grid-container { max-width: 1320px !important; }
+            .site-content { max-width: 1320px !important; width: 100%; box-sizing: border-box; }
+            .site-content .content-area,
+            #primary.content-area { width: 100% !important; max-width: 100% !important; float: none !important; }
+            #right-sidebar, #left-sidebar { display: none !important; }
+            .site-content { display: block !important; }
+            body.home .kw-home { max-width: 1120px; padding-left: 24px; padding-right: 24px; }
+            body.category .site-main { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+            body.category .site-content { padding: 24px 28px !important; }
+            .kw-story-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+            .kw-story-card { min-width: 0; }
+            .kw-footer-inner { max-width: 1120px; }
+        }
         /* Keep the desktop navigation on one line where possible and allow a clean wrap on smaller desktops. */
         @media (min-width: 761px) {
             .main-navigation .inside-navigation { display: flex; align-items: center; }
@@ -581,6 +592,8 @@ body.category .kw-archive-read a:hover {
             .main-navigation .main-nav > ul > li { flex: 0 0 auto; }
             .main-navigation .main-nav > ul > li > a { padding-left: 11px; padding-right: 11px; white-space: normal; line-height: 1.35; }
         }
+        /* Hide legacy counter output as a safety net; actual view metadata is retained. */
+        .kw-archive-views, .kw-story-views, .kw-card-meta .view-count, .post-views, .views-count { display: none !important; }
         .kw-legal .kw-story-card { line-height: 1.7; }
         .kw-legal .kw-story-card h2 { color: var(--kw-brand-dark); margin-top: 22px; }
         .kw-legal .kw-story-card h2:first-child { margin-top: 0; }
@@ -650,7 +663,7 @@ add_action('wp_footer', function () {
                     <a href="/category/village-stories/">Village Stories</a>
                     <a href="/category/real-stories/">Real Stories</a>
                     <a href="/category/romantic-stories/">Romantic Stories</a>
-                    <a href="/category/hindi-sex-stories/">Hindi Sex Stories</a>
+                    <a href="/category/hindi-sex-story/">Hindi Sex Stories</a>
                     <a href="/category/bhabhi-sex-story/">Bhabhi Sex Story</a>
                 </div>
             </section>
@@ -692,24 +705,7 @@ add_action('wp_footer', function () {
 add_filter('generate_comments_title_output', function ($output, $comments_title, $comments_number) {
     return '<h3 class="comments-title">Comments</h3>';
 }, 10, 3);
-/* Show story views on category archive cards */
-add_filter('generate_header_entry_meta_items', function ($items) {
-    if (is_category()) {
-        $items[] = 'kw-story-views';
-    }
-
-    return $items;
-}, 20);
-
-add_action('generate_post_meta_items', function ($item) {
-    if ('kw-story-views' !== $item || !is_category()) {
-        return;
-    }
-
-    $views = number_format_i18n(kw_story_views(get_the_ID()));
-
-    echo '<span class="kw-archive-views">👁 ' . esc_html($views) . '</span>';
-});
+/* View counts remain stored internally for sorting/analytics, but are hidden from visitors. */
 
 
 /* Show story tags directly after the story content */

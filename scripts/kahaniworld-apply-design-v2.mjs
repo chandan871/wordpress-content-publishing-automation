@@ -26,7 +26,7 @@ const snippetCode = await fs.readFile(path.join(rootDir, "scripts/kahaniworld-si
 
 await upsertSnippet({
   name: "Kahani World site design, night mode, views",
-  desc: "Site-wide design system, night mode toggle, footer, post views, and latest-stories shortcode.",
+  desc: "Site-wide design system, night mode toggle, footer, private view tracking, and latest-stories shortcode.",
   code: snippetCode,
 });
 
@@ -142,7 +142,7 @@ function buildHomeContent() {
       <a class="kw-chip" href="/category/village-stories/">Village Stories</a>
       <a class="kw-chip" href="/category/real-stories/">Real Stories</a>
       <a class="kw-chip" href="/category/romantic-stories/">Romantic Stories</a>
-      <a class="kw-chip" href="/category/hindi-sex-stories/">Hindi Sex Stories</a>
+      <a class="kw-chip" href="/category/hindi-sex-story/">Hindi Sex Story</a>
       <a class="kw-chip" href="/category/bhabhi-sex-story/">Bhabhi Sex Story</a>
     </div>
   </details>
