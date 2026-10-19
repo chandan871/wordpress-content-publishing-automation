@@ -124,8 +124,8 @@ function buildHomeContent() {
 <!-- wp:html -->
 <main class="kw-home">
   <section class="kw-hero">
-    <h1>Hindi Adult Stories</h1>
-    <p>Desi kahani, village stories, real experiences aur long Hindi adult series ka bold collection. Nayi kahaniyan, clean mobile reading aur fast navigation ke saath.</p>
+    <h1>Hindi Adult Stories, Hindi Sex Stories aur Desi Sex Stories</h1>
+    <p>Kahani World par roz nayi Hindi adult stories aur Hindi sex story (हिंदी सेक्स स्टोरी) padhein: akeli bhabhi, padosan aunty, <a href="/category/village-stories/">village sex stories</a>, <a href="/category/real-stories/">real sex stories</a> aur <a href="/category/romantic-stories/">romantic sex stories</a>. Har din ek nayi hot chudai ki kahani, aur aisi multi-part series jinka agla part aap miss nahi karna chahenge. Kahani World ki sabhi kahaniyon ke paatr adult hain. Sirf 18+ readers ke liye.</p>
   </section>
 
   <nav class="kw-quick" aria-label="Quick story links">

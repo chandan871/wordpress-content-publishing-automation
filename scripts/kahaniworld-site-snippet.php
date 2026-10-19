@@ -651,18 +651,19 @@ add_action('wp_footer', function () {
         <div class="kw-footer-inner">
             <section>
                 <h3>Kahani World</h3>
-                <p>Hindi adult stories, desi kahani, village stories aur long multi-part series ke liye mobile-first reading site.</p>
+                 <p>Hindi sex story aur adult kahani ka roz badhta collection: bhabhi, aunty, padosan, village aur real stories, multi-part series ke saath.</p>
+    <p>Kahani World ki sabhi kahaniyon ke paatr adult hain. Yahan ki kahaniyan sirf manoranjan ke liye hain, aur sirf 18+ readers ke liye.</p>
             </section>
             <section>
                 <h3>Explore</h3>
                 <div class="kw-footer-links">
-                    <a href="/new-stories/">New Stories</a>
-                    <a href="/most-popular-stories/">Most Popular</a>
-                    <a href="/category/hindi-adult-stories/">Hindi Stories</a>
-                    <a href="/category/desi-stories/">Desi Stories</a>
-                    <a href="/category/village-stories/">Village Stories</a>
-                    <a href="/category/real-stories/">Real Stories</a>
-                    <a href="/category/romantic-stories/">Romantic Stories</a>
+                    <a href="/new-stories/">New Sex Stories</a>
+                    <a href="/most-popular-stories/">Most Popular Sex Stories</a>
+                    <a href="/category/hindi-adult-stories/">Hindi Adult Stories</a>
+                    <a href="/category/desi-stories/">Desi Sex Stories</a>
+                    <a href="/category/village-stories/">Village Sex Stories</a>
+                    <a href="/category/real-stories/">Real Sex Stories</a>
+                    <a href="/category/romantic-stories/">Romantic Sex Stories</a>
                     <a href="/category/hindi-sex-story/">Hindi Sex Stories</a>
                     <a href="/category/bhabhi-sex-story/">Bhabhi Sex Story</a>
                 </div>
