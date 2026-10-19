@@ -30,11 +30,6 @@ await upsertSnippet({
   code: snippetCode,
 });
 
-if (process.argv.includes("--snippet-only")) {
-  console.log(JSON.stringify({ ok: true, updated: "site snippet", pagesSkipped: true }, null, 2));
-  process.exit(0);
-}
-
 const pages = await wpRequest("/wp/v2/pages?slug=home&context=edit");
 const home = pages[0] || await wpRequest("/wp/v2/pages/30?context=edit");
 await wpRequest(`/wp/v2/pages/${home.id}`, {

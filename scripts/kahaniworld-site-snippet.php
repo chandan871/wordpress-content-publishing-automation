@@ -821,13 +821,13 @@ add_filter('the_content', function ($content) {
         $plain = html_entity_decode(wp_strip_all_tags($paragraph[0]), ENT_QUOTES | ENT_HTML5, get_bloginfo('charset') ?: 'UTF-8');
         preg_match_all('/[\p{L}\p{N}]+/u', $plain, $words);
         $word_count += count($words[0]);
-        if ($word_count >= 250) {
+        if ($word_count >= 700) {
             $insert_at = $paragraph[1] + strlen($paragraph[0]);
             break;
         }
     }
 
-    // If the story has fewer than 250 words before Related Stories, skip the in-body unit.
+    // If the story has fewer than 225 words before Related Stories, skip the in-body unit.
     if ($insert_at === null) {
         return $content;
     }
