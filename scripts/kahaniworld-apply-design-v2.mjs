@@ -26,9 +26,14 @@ const snippetCode = await fs.readFile(path.join(rootDir, "scripts/kahaniworld-si
 
 await upsertSnippet({
   name: "Kahani World site design, night mode, views",
-  desc: "Site-wide design system, night mode toggle, footer, private view tracking, and latest-stories shortcode.",
+  desc: "Site-wide design system, night mode toggle, footer, private view tracking, latest-stories shortcode, and story ad placements.",
   code: snippetCode,
 });
+
+if (process.argv.includes("--snippet-only")) {
+  console.log(JSON.stringify({ ok: true, updated: "site snippet", pagesSkipped: true }, null, 2));
+  process.exit(0);
+}
 
 const pages = await wpRequest("/wp/v2/pages?slug=home&context=edit");
 const home = pages[0] || await wpRequest("/wp/v2/pages/30?context=edit");

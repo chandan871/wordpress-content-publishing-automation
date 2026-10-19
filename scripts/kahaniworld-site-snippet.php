@@ -770,6 +770,73 @@ add_action('wp_head', function () {
 }, 99);
 
 
+/* JuicyAds story placements: single posts only; homepage/archive pages are excluded. */
+function kw_juicyads_render_slot($zone_id, $placement) {
+    $zone_id = (string) $zone_id;
+    // An unset/invalid zone ID fails closed, so no placeholder or broken ad is shown.
+    if (!preg_match('/^[0-9]+$/', $zone_id) || (int) $zone_id < 1) {
+        return '';
+    }
+
+    $class = 'kw-juicyads-slot kw-juicyads-slot--' . sanitize_html_class($placement);
+    $id = (int) $zone_id;
+
+    // Keep JuicyAds' supplied tag structure intact; each placement must have its own zone ID.
+    return '<div class="' . esc_attr($class) . '" aria-label="Advertisement">'
+        . '<script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>'
+        . '<ins id="' . $id . '" data-width="300" data-height="100"></ins>'
+        . '<script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({\'adzone\':' . $id . '});</script>'
+        . '</div>';
+}
+
+function kw_juicyads_mid_story_zone_id() {
+    return '1129491'; // Existing mobile 300x100 zone.
+}
+
+function kw_juicyads_related_top10_zone_id() {
+    return '1129494'; // Create a separate mobile 300x100 zone for this position.
+}
+
+add_filter('the_content', function ($content) {
+    if (!is_single() || get_post_type() !== 'post' || !in_the_loop() || !is_main_query()) {
+        return $content;
+    }
+
+    $ad = kw_juicyads_render_slot(kw_juicyads_mid_story_zone_id(), 'mid-story');
+    if ($ad === '') {
+        return $content;
+    }
+
+    // Only count story paragraphs before Related Stories, not links/tags below the story.
+    $story_end = strlen($content);
+    if (preg_match('/<nav\b[^>]*class=("|\')[^"\']*\bkw-story-links\b[^"\']*\1[^>]*>/i', $content, $nav, PREG_OFFSET_CAPTURE)) {
+        $story_end = $nav[0][1];
+    }
+    $story = substr($content, 0, $story_end);
+    preg_match_all('/<p\b[^>]*>.*?<\/p>/is', $story, $paragraphs, PREG_OFFSET_CAPTURE);
+
+    $word_count = 0;
+    $insert_at = null;
+    foreach ($paragraphs[0] as $paragraph) {
+        $plain = html_entity_decode(wp_strip_all_tags($paragraph[0]), ENT_QUOTES | ENT_HTML5, get_bloginfo('charset') ?: 'UTF-8');
+        preg_match_all('/[\p{L}\p{N}]+/u', $plain, $words);
+        $word_count += count($words[0]);
+        if ($word_count >= 250) {
+            $insert_at = $paragraph[1] + strlen($paragraph[0]);
+            break;
+        }
+    }
+
+    // If the story has fewer than 250 words before Related Stories, skip the in-body unit.
+    if ($insert_at === null) {
+        return $content;
+    }
+
+    return substr($content, 0, $insert_at)
+        . $ad
+        . substr($content, $insert_at);
+}, 18);
+
 /* Insert story tags immediately after the related-story links */
 add_filter('the_content', function ($content) {
     if (!is_singular('post') || !in_the_loop() || !is_main_query()) {
@@ -886,6 +953,13 @@ add_filter('the_content', function ($content) {
     $best_html .= implode('', $items);
     $best_html .= '</ol></section>';
 
+    // Inject the second ad directly before Top 10, so its position remains correct
+    // whether the post content contains an article wrapper or not.
+    $related_top10_ad = kw_juicyads_render_slot(kw_juicyads_related_top10_zone_id(), 'related-top10');
+    if ($related_top10_ad !== '') {
+        $best_html = $related_top10_ad . $best_html;
+    }
+
     // Insert after the related-story links, before the closing article.
     $closing = strrpos($content, '</article>');
 
@@ -905,6 +979,19 @@ add_action('wp_head', function () {
     }
     ?>
     <style>
+        body.single-post .kw-juicyads-slot {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            max-width: 100%;
+            margin: 22px auto;
+            overflow: hidden;
+        }
+
+        body.single-post .kw-juicyads-slot ins {
+            max-width: 100%;
+        }
+
         .kw-best-stories {
             margin: 24px 0;
             padding: 16px;
