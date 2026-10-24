@@ -548,21 +548,24 @@ async function prepareRow(row, context) {
   const id = cell(row, "ID");
   const title = cleanText(cell(row, "Title"));
   const story = cell(row, "Story");
-  const categoryName = cleanText(cell(row, "Category"));
+  const categoryNames = splitList(cell(row, "Category"));
+  const categoryName = categoryNames.join(", ");
   const suppliedSeoTitle = cleanText(cell(row, "SEO Title"));
   const suppliedMetaDescription = cleanText(cell(row, "Meta Description"));
   const suppliedSlug = cleanText(cell(row, "Slug"));
   const suppliedTeaser = cleanText(cell(row, "Teaser"));
   const suppliedTags = splitList(cell(row, "Tags"));
 
-  const category = resolveCategory(categoryName, context.categories);
+  const resolvedCategories = resolveCategories(categoryNames, context.categories);
+  const primaryCategory = resolvedCategories[0];
+  const categoryIds = resolvedCategories.map((category) => category.id);
   const seoTitle = suppliedSeoTitle || generateSeoTitle(title);
   const metaDescription = suppliedMetaDescription || generateMetaDescription({ title, story, categoryName });
   const slug = suppliedSlug ? slugify(suppliedSlug) : await generateUniqueSlug(title, categoryName, id, context.posts);
   const excerpt = suppliedTeaser || generateExcerpt(story);
   const tags = suppliedTags.length ? suppliedTags : generateTags({ title, story, categoryName });
   const tagIds = await resolveTags(tags, context.tags, { create: false });
-  const internalLinks = selectInternalLinks({ categoryId: category.id, currentTitle: title, posts: context.posts });
+  const internalLinks = selectInternalLinks({ categoryId: primaryCategory.id, currentTitle: title, posts: context.posts });
   assertRawInternalLinks(internalLinks, "selectInternalLinks");
   const content = buildPostHtml({
   story,
@@ -575,8 +578,10 @@ async function prepareRow(row, context) {
   return {
     id,
     title,
-    category: category.name,
-    categoryId: category.id,
+    category: primaryCategory.name,
+    categories: resolvedCategories.map((category) => category.name),
+    categoryId: primaryCategory.id,
+    categoryIds,
     tags,
     tagIds,
     seoTitle,
@@ -590,13 +595,14 @@ async function prepareRow(row, context) {
       status: "publish",
       slug,
       excerpt,
-      categories: [category.id],
+      categories: categoryIds,
       tags: tagIds,
       meta: {
         rank_math_title: seoTitle,
         rank_math_description: metaDescription,
         rank_math_focus_keyword: deriveFocusKeyword({ categoryName, title }),
         kw_story_id: id,
+        rank_math_primary_category: primaryCategory.id,
       },
     },
     warnings: tagIds.length < tags.length ? ["Some tags do not exist yet; production mode can create them safely."] : [],
@@ -660,10 +666,15 @@ function splitList(value) {
     .slice(0, 8);
 }
 
-function resolveCategory(categoryName, categories) {
-  const exact = categories.find((category) => category.name.toLowerCase() === categoryName.toLowerCase());
-  if (exact) return exact;
-  throw new Error(`Category does not exist in WordPress: ${categoryName}`);
+function resolveCategories(categoryNames, categories) {
+  const names = [...new Set((categoryNames || []).map(cleanText).filter(Boolean))];
+  if (!names.length) throw new Error("At least one Category is required.");
+
+  return names.map((name) => {
+    const exact = categories.find((category) => category.name.toLowerCase() === name.toLowerCase());
+    if (exact) return exact;
+    throw new Error(`Category does not exist in WordPress: ${name}`);
+  });
 }
 
 function generateSeoTitle(title) {
@@ -899,22 +910,21 @@ function selectInternalLinks({ categoryId, currentTitle, posts }) {
 function parseSeriesPart(title) {
   const value = cleanText(title);
 
-  let match = value.match(/^(.*?)\s*[-–—|]\s*Part\s*(\d+)(?:\s*\|\s*.*)?$/i);
+  // Current KahaniWorld format: "Series Name Part 2 – Hindi Adult Story".
+  let match = value.match(/^(.*?)\s+Part\s*(\d+)\s*[-–—|]\s*.+$/i);
   if (match) {
-    return {
-      seriesTitle: cleanText(match[1]),
-      partNumber: Number(match[2]),
-      separator: match[1].trim(),
-    };
+    return { seriesTitle: cleanText(match[1].replace(/[\s–—|]+$/g, "")), partNumber: Number(match[2]), separator: match[1].trim() };
   }
 
-  match = value.match(/^(.*?)\s*भाग\s*(\d+)(?:\s*\|\s*.*)?$/i);
+  // Alternate format: "Series Name – Part 2" (optionally followed by a pipe suffix).
+  match = value.match(/^(.*?)\s*[-–—|]\s*Part\s*(\d+)(?:\s*\|\s*.*)?$/i);
   if (match) {
-    return {
-      seriesTitle: cleanText(match[1]),
-      partNumber: Number(match[2]),
-      separator: match[1].trim(),
-    };
+    return { seriesTitle: cleanText(match[1].replace(/[\s–—|]+$/g, "")), partNumber: Number(match[2]), separator: match[1].trim() };
+  }
+
+  match = value.match(/^(.*?)\s+भाग\s*(\d+)(?:\s*[-–—|]\s*.*)?$/i);
+  if (match) {
+    return { seriesTitle: cleanText(match[1].replace(/[\s–—|]+$/g, "")), partNumber: Number(match[2]), separator: match[1].trim() };
   }
 
   return null;
@@ -1084,15 +1094,10 @@ ${safeInternalLinks
   /*
    * MULTIPART STORY NAVIGATION
    */
-  const seriesNavigation = buildSeriesNavigation(
-    title,
-    seriesPosts
-  );
-
+  // Multipart navigation is rendered dynamically by the WordPress snippet so
+  // earlier parts automatically link to parts published later.
   return `<article class="kw-story-post">
-${inlineHtml(seriesNavigation)}
 <div class="kw-story-body">${paragraphs}</div>
-${inlineHtml(seriesNavigation)}
 ${inlineHtml(links)}
 </article>`;
 }

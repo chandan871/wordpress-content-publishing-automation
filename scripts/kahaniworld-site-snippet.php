@@ -21,6 +21,227 @@ function kw_story_views($post_id = null) {
     return max(0, (int) get_post_meta($post_id, 'kw_story_views', true));
 }
 
+/**
+ * Parse both supported title patterns, including the site's current format:
+ * "Series Name Part 2 – English suffix" and "Series Name – Part 2 | suffix".
+ */
+function kw_parse_series_part_title($title) {
+    $title = trim(wp_strip_all_tags((string) $title));
+
+    // Current KahaniWorld title format: Series Name Part 2 – Hindi Adult Story.
+    if (preg_match('/^(.*?)\s+Part\s*(\d+)\s*[-–—|]\s*.+$/iu', $title, $match)) {
+        return ['series_title' => trim(preg_replace('/\s*[-–—|]\s*$/u', '', trim($match[1]))), 'part_number' => (int) $match[2]];
+    }
+
+    // Alternate format: Series Name – Part 2 (optionally followed by a pipe suffix).
+    if (preg_match('/^(.*?)\s*[-–—|]\s*Part\s*(\d+)(?:\s*\|\s*.*)?$/iu', $title, $match)) {
+        return ['series_title' => trim(preg_replace('/\s*[-–—|]\s*$/u', '', trim($match[1]))), 'part_number' => (int) $match[2]];
+    }
+
+    // Hindi format: Series Name भाग 2, optionally followed by a suffix.
+    if (preg_match('/^(.*?)\s+भाग\s*(\d+)(?:\s*[-–—|]\s*.*)?$/iu', $title, $match)) {
+        return ['series_title' => trim(preg_replace('/\s*[-–—|]\s*$/u', '', trim($match[1]))), 'part_number' => (int) $match[2]];
+    }
+
+    return null;
+}
+
+function kw_normalize_series_title($title) {
+    $title = remove_accents(strtolower(trim((string) $title)) );
+    $title = preg_replace('/[–—-]+/u', ' ', $title);
+    return trim(preg_replace('/\s+/u', ' ', $title));
+}
+
+
+/**
+ * Build dynamic navigation for all published parts of a story series.
+ * Series membership is determined by the existing title parser.
+ */
+function kw_build_dynamic_series_navigation($post_id) {
+    $post_id = (int) $post_id;
+
+    if (!$post_id || get_post_type($post_id) !== 'post') {
+        return '';
+    }
+
+    // Parse the current post title.
+    $current_title = get_the_title($post_id);
+    $current = kw_parse_series_part_title($current_title);
+
+    // Ordinary stories without a recognised part number need no navigation.
+    if (!$current || (int) $current['part_number'] < 1) {
+        return '';
+    }
+
+    $series_key = kw_normalize_series_title($current['series_title']);
+
+    if ($series_key === '') {
+        return '';
+    }
+
+    /*
+     * Fetch all published posts, not just the first 1,000.
+     * suppress_filters prevents unrelated query filters from hiding siblings.
+     */
+    $candidates = get_posts([
+        'post_type'              => 'post',
+        'post_status'            => 'publish',
+        'posts_per_page'         => -1,
+        'orderby'                => 'date',
+        'order'                  => 'ASC',
+        'no_found_rows'          => true,
+        'ignore_sticky_posts'    => true,
+        'suppress_filters'       => true,
+        'update_post_meta_cache' => false,
+        'update_post_term_cache' => false,
+    ]);
+
+    $parts = [];
+
+    foreach ($candidates as $candidate) {
+        $parsed = kw_parse_series_part_title($candidate->post_title);
+
+        if (!$parsed) {
+            continue;
+        }
+
+        // Only include posts whose parsed series title matches this series.
+        if (
+            kw_normalize_series_title($parsed['series_title'])
+            !== $series_key
+        ) {
+            continue;
+        }
+
+        $number = (int) $parsed['part_number'];
+
+        if ($number < 1) {
+            continue;
+        }
+
+        // Keep one published post per part number.
+        // Prefer the current post if a duplicate number exists.
+        if (
+            !isset($parts[$number])
+            || (int) $candidate->ID === $post_id
+        ) {
+            $parts[$number] = [
+                'id'     => (int) $candidate->ID,
+                'number' => $number,
+                'url'    => get_permalink($candidate->ID),
+            ];
+        }
+    }
+
+    // Guarantee that the current published post is represented.
+    $current_number = (int) $current['part_number'];
+
+    $parts[$current_number] = [
+        'id'     => $post_id,
+        'number' => $current_number,
+        'url'    => get_permalink($post_id),
+    ];
+
+    // Display parts in numerical order: 1, 2, 3, 4...
+    ksort($parts, SORT_NUMERIC);
+
+    // Do not display series navigation for a single-part story.
+   
+    // Fallback for the two existing Daadi posts if dynamic discovery
+    // fails to find both published parts.
+    $current_slug = (string) get_post_field('post_name', $post_id);
+
+    $daadi_parts = [
+        1 => 'daadi-ke-saath-masti-chudai-hindi-adult-story',
+        2 => 'daadi-ke-saath-masti-part-2-chudai-hindi-adult-story',
+    ];
+
+    if (
+        count($parts) < 2
+        && in_array($current_slug, $daadi_parts, true)
+    ) {
+        foreach ($daadi_parts as $number => $slug) {
+            $sibling = get_page_by_path($slug, OBJECT, 'post');
+
+            if ($sibling && $sibling->post_status === 'publish') {
+                $parts[$number] = [
+                    'id'     => (int) $sibling->ID,
+                    'number' => (int) $number,
+                    'url'    => get_permalink($sibling->ID),
+                ];
+            }
+        }
+
+        ksort($parts, SORT_NUMERIC);
+    }
+
+    // Ordinary single-part stories should have no series navigation.
+    if (count($parts) < 2) {
+        return '';
+    }
+
+
+    $links = [];
+
+    foreach ($parts as $part) {
+        $number = (int) $part['number'];
+
+        if ($number === $current_number) {
+            $links[] =
+                '<span class="kw-series-current" aria-current="page">'
+                . 'Part ' . $number
+                . '</span>';
+        } else {
+            $links[] =
+                '<a href="' . esc_url($part['url']) . '">'
+                . 'Part ' . $number
+                . '</a>';
+        }
+    }
+
+    return
+        '<nav class="kw-series-nav" aria-label="Story parts">'
+        . '<strong class="kw-series-title">इस कहानी के सभी भाग</strong>'
+        . '<div class="kw-series-links">'
+        . implode(
+            ' <span class="kw-series-separator">|</span> ',
+            $links
+        )
+        . '</div>'
+        . '</nav>';
+}
+
+
+// Replace any old, publish-time series markup with live navigation at the top and bottom.
+add_filter('the_content', function ($content) {
+    if (!is_singular('post')) return $content;
+
+    $post_id = get_queried_object_id();
+    if (!$post_id) return $content;
+
+    $content = preg_replace('/<nav\b(?=[^>]*\bclass=("|\')[^"\']*\bkw-series-nav\b[^"\']*\1)[^>]*>.*?<\/nav>/is', '', $content);
+    $nav = kw_build_dynamic_series_navigation($post_id);
+    if ($nav === '') return $content;
+
+    // Place the first navigation before the story body and the second immediately after it.
+    if (preg_match('/<div\b[^>]*class=("|\')[^"\']*\bkw-story-body\b[^"\']*\1[^>]*>/i', $content, $body, PREG_OFFSET_CAPTURE)) {
+        $body_start = $body[0][1];
+        $content = substr($content, 0, $body_start) . $nav . substr($content, $body_start);
+        if (preg_match('/<\/div>/i', $content, $close, PREG_OFFSET_CAPTURE, $body_start + strlen($nav) + strlen($body[0][0]))) {
+            $close_end = $close[0][1] + strlen($close[0][0]);
+            $content = substr($content, 0, $close_end) . $nav . substr($content, $close_end);
+        }
+        return $content;
+    }
+
+    // Fallback for older content that does not use the publisher's story-body wrapper.
+    $related_pos = strpos($content, '<nav class="kw-story-links">');
+    if ($related_pos !== false) {
+        return substr($content, 0, $related_pos) . $nav . substr($content, $related_pos);
+    }
+    return $nav . $content . $nav;
+}, 11);
+
 add_filter('the_content', function ($content) {
     if (!is_single() || get_post_type() !== 'post' || !in_the_loop() || !is_main_query()) {
         return $content;
@@ -501,6 +722,39 @@ body.category .kw-archive-read a:hover {
         .kw-story-post .kw-story-body {
             padding: 4px 0 8px;
         }
+        .kw-story-post .kw-series-nav {
+            margin: 16px 0;
+            padding: 12px 14px;
+            border: 1px solid var(--kw-border);
+            border-radius: 8px;
+            background: var(--kw-card);
+            font-size: 14px;
+            line-height: 1.8;
+            overflow-wrap: anywhere;
+        }
+        .kw-story-post .kw-series-title {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--kw-brand-dark);
+        }
+        .kw-story-post .kw-series-links {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+        }
+        .kw-story-post .kw-series-nav a {
+            color: var(--kw-link);
+            font-weight: 700;
+            text-decoration: underline;
+        }
+        .kw-story-post .kw-series-current {
+            font-weight: 700;
+            color: var(--kw-text);
+        }
+        .kw-story-post .kw-series-separator {
+            color: var(--kw-border);
+        }
         .kw-story-post .kw-story-links {
             margin-top: 28px;
             padding: 16px;
@@ -632,6 +886,15 @@ body.category .kw-archive-read a:hover {
             .kw-chip-grid { grid-template-columns: repeat(3,1fr); }
             .kw-footer-inner { grid-template-columns: 1.2fr 1fr 1fr; }
         }
+        /* Category-page ExoClick outstream placement */
+body.category .kw-category-outstream {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 8px auto 16px;
+    overflow: hidden;
+}
     </style>
     <script>
         (function () {
@@ -677,6 +940,8 @@ add_action('wp_footer', function () {
                     <a href="/privacy-policy/">Privacy Policy</a>
                     <a href="/cookies-policy/">Cookies Policy</a>
                     <a href="/terms-of-use/">Terms of Use</a>
+                    <a href="/dmca/">DMCA &amp; Copyright Policy</a>
+                    <a href="/2257-compliance/">18 U.S.C. § 2257 Compliance</a>
                 </div>
             </section>
         </div>
@@ -771,22 +1036,26 @@ add_action('wp_head', function () {
 
 
 /* JuicyAds story placements: single posts only; homepage/archive pages are excluded. */
+// function kw_juicyads_render_slot($zone_id, $placement) {
+//     $zone_id = (string) $zone_id;
+//     // An unset/invalid zone ID fails closed, so no placeholder or broken ad is shown.
+//     if (!preg_match('/^[0-9]+$/', $zone_id) || (int) $zone_id < 1) {
+//         return '';
+//     }
+
+//     $class = 'kw-juicyads-slot kw-juicyads-slot--' . sanitize_html_class($placement);
+//     $id = (int) $zone_id;
+
+//     // Keep JuicyAds' supplied tag structure intact; each placement must have its own zone ID.
+//     return '<div class="' . esc_attr($class) . '" aria-label="Advertisement">'
+//         . '<script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>'
+//         . '<ins id="' . $id . '" data-width="300" data-height="100"></ins>'
+//         . '<script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({\'adzone\':' . $id . '});</script>'
+//         . '</div>';
+// }
+
 function kw_juicyads_render_slot($zone_id, $placement) {
-    $zone_id = (string) $zone_id;
-    // An unset/invalid zone ID fails closed, so no placeholder or broken ad is shown.
-    if (!preg_match('/^[0-9]+$/', $zone_id) || (int) $zone_id < 1) {
-        return '';
-    }
-
-    $class = 'kw-juicyads-slot kw-juicyads-slot--' . sanitize_html_class($placement);
-    $id = (int) $zone_id;
-
-    // Keep JuicyAds' supplied tag structure intact; each placement must have its own zone ID.
-    return '<div class="' . esc_attr($class) . '" aria-label="Advertisement">'
-        . '<script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>'
-        . '<ins id="' . $id . '" data-width="300" data-height="100"></ins>'
-        . '<script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({\'adzone\':' . $id . '});</script>'
-        . '</div>';
+    return '';
 }
 
 function kw_juicyads_mid_story_zone_id() {
@@ -802,7 +1071,10 @@ add_filter('the_content', function ($content) {
         return $content;
     }
 
-    $ad = kw_juicyads_render_slot(kw_juicyads_mid_story_zone_id(), 'mid-story');
+    //$ad = kw_juicyads_render_slot(kw_juicyads_mid_story_zone_id(), 'mid-story');
+    $ad = '<script async type="application/javascript" src="https://a.magsrv.com/ad-provider.js"></script>'
+    . '<ins class="eas6a97888e37" data-zoneid="6063706"></ins>'
+    . '<script>(AdProvider = window.AdProvider || []).push({"serve": {}});</script>';
     if ($ad === '') {
         return $content;
     }
@@ -1217,3 +1489,36 @@ add_action('wp_head', function () {
     </style>
     <?php
 }, 99);
+
+
+/* KahaniWorld: ExoClick video ad after the third category story card */
+add_action('generate_after_do_template_part', function () {
+    if (
+        !is_category()
+        || !is_main_query()
+        || get_post_type() !== 'post'
+    ) {
+        return;
+    }
+
+    static $kw_category_card_count = 0;
+    static $kw_category_ad_inserted = false;
+
+    if ($kw_category_ad_inserted) {
+        return;
+    }
+
+    $kw_category_card_count++;
+
+    if ($kw_category_card_count !== 3) {
+        return;
+    }
+
+    $kw_category_ad_inserted = true;
+
+    echo '<div class="kw-category-outstream" aria-label="Advertisement">'
+        . '<script async type="application/javascript" src="https://a.magsrv.com/ad-provider.js"></script>'
+        . '<ins class="eas6a97888e37" data-zoneid="6064294"></ins>'
+        . '<script>(AdProvider = window.AdProvider || []).push({"serve": {}});</script>'
+        . '</div>';
+}, 20);

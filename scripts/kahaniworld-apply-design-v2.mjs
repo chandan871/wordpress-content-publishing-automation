@@ -76,7 +76,11 @@ await ensureUtilityPage({
   slug: "terms-of-use",
   content: buildTermsPage(),
 });
-
+await ensureUtilityPage({
+  title: "18 U.S.C. § 2257 Compliance Statement",
+  slug: "2257-compliance",
+  content: build2257CompliancePage(),
+});
 console.log(JSON.stringify({ ok: true, homepage: home.id }, null, 2));
 
 async function upsertSnippet({ name, desc, code }) {
@@ -255,6 +259,26 @@ function buildAdvertisePage() {
     <h2>What to include</h2><ul><li>Your business or brand name and website URL</li><li>The product or service being promoted</li><li>Preferred placement, campaign dates, and budget range</li><li>Your contact details and any creative or destination URLs</li></ul>
     <h2>Content and safety standards</h2><p>We may decline advertising that is deceptive, unlawful, malicious, misleading, or unsuitable for the site. Advertisements must not use forced redirects, malware, fake system alerts, or deceptive download prompts. Sponsored placements, where accepted, should be identifiable as advertising. Third-party advertising providers may have additional rules and privacy practices.</p>
     <h2>Contact</h2><p>Email <a href="mailto:kahaniworld@protonmail.com">kahaniworld@protonmail.com</a> with the subject “Advertising Enquiry”. Please do not send passwords, payment-card details, or other sensitive information by email.</p>
+  </article>
+</main>
+<!-- /wp:html -->`.trim();
+}
+
+function build2257CompliancePage() {
+  return `
+<!-- wp:html -->
+<main class="kw-home kw-legal">
+  <section class="kw-hero">
+    <h1>18 U.S.C. § 2257 Compliance Statement</h1>
+    <p>Last updated: October 23, 2026.</p>
+  </section>
+  <article class="kw-story-card">
+    <p>Kahani World (https://kahaniworld.com/) publishes written fictional stories and text-based content.</p>
+    <p>This website does not publish photographs, videos, or other visual depictions of actual human beings engaged in sexually explicit conduct. The website's content is text-based and does not contain visual depictions of the kind addressed by the record-keeping requirements of 18 U.S.C. § 2257.</p>
+    <p>Based on the site's current text-only format, Kahani World does not maintain performer identification records under 18 U.S.C. § 2257 because it does not publish such visual depictions.</p>
+    <p>If the nature of the website's content changes, this statement will be reviewed and updated as appropriate.</p>
+    <h2>Contact</h2>
+    <p>For questions regarding this statement, contact <a href="mailto:kahaniworld@protonmail.com">kahaniworld@protonmail.com</a>.</p>
   </article>
 </main>
 <!-- /wp:html -->`.trim();
